@@ -37,6 +37,9 @@ const preventReset = async (type, data, device) => {
     await device.getEndpoint(1).write('genBasic', payload, options);
 };
 
+// Взято из файла 'zigbee-herdsman-converters/converters/fromZigbee' 
+// и добавлена модель выключателя. В случае обновления этого кода в оригинальном файле
+// нужно обновить этот кусок и здесь.
 fz.xiaomi_multistate_action = {
         cluster: 'genMultistateInput',
         type: ['attributeReport'],
