@@ -10,12 +10,27 @@ const {
 } = require('zigbee-herdsman-converters/lib/utils');
 const fz = require( 'zigbee-herdsman-converters/converters/fromZigbee' );
 const tz = require( 'zigbee-herdsman-converters/converters/toZigbee' );
+const herdsman = require('zigbee-herdsman');
 const ota = require('zigbee-herdsman-converters/lib/ota');
 const exposes = require( 'zigbee-herdsman-converters/lib/exposes' );
 const reporting = require( 'zigbee-herdsman-converters/lib/reporting' );
 const extend = require( 'zigbee-herdsman-converters/lib/extend' );
 const e = exposes.presets;
 const ea = exposes.access;
+
+const manufacturerOptions = {
+    sunricher: {manufacturerCode: herdsman.Zcl.ManufacturerCode.SHENZHEN_SUNRICH},
+    xiaomi: {manufacturerCode: herdsman.Zcl.ManufacturerCode.LUMI_UNITED_TECH, disableDefaultResponse: true},
+    osram: {manufacturerCode: herdsman.Zcl.ManufacturerCode.OSRAM},
+    eurotronic: {manufacturerCode: herdsman.Zcl.ManufacturerCode.JENNIC},
+    danfoss: {manufacturerCode: herdsman.Zcl.ManufacturerCode.DANFOSS},
+    hue: {manufacturerCode: herdsman.Zcl.ManufacturerCode.PHILIPS},
+    ikea: {manufacturerCode: herdsman.Zcl.ManufacturerCode.IKEA_OF_SWEDEN},
+    sinope: {manufacturerCode: herdsman.Zcl.ManufacturerCode.SINOPE_TECH},
+    tint: {manufacturerCode: herdsman.Zcl.ManufacturerCode.MUELLER_LICHT_INT},
+    legrand: {manufacturerCode: herdsman.Zcl.ManufacturerCode.VANTAGE, disableDefaultResponse: true},
+    viessmann: {manufacturerCode: herdsman.Zcl.ManufacturerCode.VIESSMAN_ELEKTRO},
+};
 
 const preventReset = async (type, data, device) => {
     if (
@@ -81,6 +96,51 @@ fz.xiaomi_multistate_action = {
         },
 }
 
+// Взято из файла 'zigbee-herdsman-converters/converters/toZigbee' 
+// и добавлена модель выключателя. В случае обновления этого кода в оригинальном файле
+// нужно обновить этот кусок и здесь.
+tz.xiaomi_switch_power_outage_memory = {
+        key: ['power_outage_memory'],
+        convertSet: async (entity, key, value, meta) => {
+            if (['SP-EUC01', 'ZNCZ04LM', 'ZNCZ12LM', 'ZNCZ15LM', 'QBCZ14LM', 'QBCZ15LM', 'SSM-U01', 'SSM-U02', 'DLKZMK11LM', 'DLKZMK12LM',
+                'WS-EUK01', 'WS-EUK02', 'WS-EUK03', 'WS-EUK04', 'QBKG19LM', 'QBKG20LM', 'QBKG25LM', 'QBKG26LM', 'QBKG28LM',
+                'QBKG31LM', 'QBKG34LM', 'QBKG38LM', 'QBKG39LM', 'QBKG40LM', 'QBKG41LM', 'ZNDDMK11LM', 
+                'WS-USC02', 'WS-USC04', 'ZNQBKG31LM', 'ZNQBKG26LM',
+            ].includes(meta.mapped.model)) {
+                await entity.write('aqaraOpple', {0x0201: {value: value ? 1 : 0, type: 0x10}}, manufacturerOptions.xiaomi);
+            } else if (['ZNCZ02LM', 'QBCZ11LM', 'LLKZMK11LM', 'ZNLDP13LM'].includes(meta.mapped.model)) {
+                const payload = value ?
+                    [[0xaa, 0x80, 0x05, 0xd1, 0x47, 0x07, 0x01, 0x10, 0x01], [0xaa, 0x80, 0x03, 0xd3, 0x07, 0x08, 0x01]] :
+                    [[0xaa, 0x80, 0x05, 0xd1, 0x47, 0x09, 0x01, 0x10, 0x00], [0xaa, 0x80, 0x03, 0xd3, 0x07, 0x0a, 0x01]];
+
+                await entity.write('genBasic', {0xFFF0: {value: payload[0], type: 0x41}}, manufacturerOptions.xiaomi);
+                await entity.write('genBasic', {0xFFF0: {value: payload[1], type: 0x41}}, manufacturerOptions.xiaomi);
+            } else if (['ZNCZ11LM'].includes(meta.mapped.model)) {
+                const payload = value ?
+                    [0xaa, 0x80, 0x05, 0xd1, 0x47, 0x00, 0x01, 0x10, 0x01] :
+                    [0xaa, 0x80, 0x05, 0xd1, 0x47, 0x01, 0x01, 0x10, 0x00];
+
+                await entity.write('genBasic', {0xFFF0: {value: payload, type: 0x41}}, manufacturerOptions.xiaomi);
+            } else {
+                throw new Error('Not supported');
+            }
+            return {state: {power_outage_memory: value}};
+        },
+        convertGet: async (entity, key, meta) => {
+            if (['SP-EUC01', 'ZNCZ04LM', 'ZNCZ12LM', 'ZNCZ15LM', 'QBCZ14LM', 'QBCZ15LM', 'SSM-U01', 'SSM-U02', 'DLKZMK11LM', 'DLKZMK12LM',
+                'WS-EUK01', 'WS-EUK02', 'WS-EUK03', 'WS-EUK04', 'QBKG19LM', 'QBKG20LM', 'QBKG25LM', 'QBKG26LM', 'QBKG28LM',
+                'QBKG31LM', 'QBKG34LM', 'QBKG38LM', 'QBKG39LM', 'QBKG40LM', 'QBKG41LM', 'ZNDDMK11LM', 'ZNLDP13LM',
+                'WS-USC02', 'WS-USC04', 'ZNQBKG31LM', 'ZNQBKG26LM',
+            ].includes(meta.mapped.model)) {
+                await entity.read('aqaraOpple', [0x0201]);
+            } else if (['ZNCZ02LM', 'QBCZ11LM', 'ZNCZ11LM'].includes(meta.mapped.model)) {
+                await entity.read('aqaraOpple', [0xFFF0]);
+            } else {
+                throw new Error('Not supported');
+            }
+        },
+    }
+    
 const definition = {
         zigbeeModel: ['lumi.switch.acn031'],
         model: 'ZNQBKG26LM',
@@ -100,7 +160,7 @@ const definition = {
                 .withDescription('Decoupled mode for right button')
                 .withEndpoint('right'),
             e.power().withAccess(ea.STATE), 
-            //e.power_outage_memory(), 
+            e.power_outage_memory(), 
             //e.led_disabled_night(), 
             e.voltage(),
             e.energy(),
@@ -120,7 +180,7 @@ const definition = {
         toZigbee: [
             tz.on_off, 
             tz.xiaomi_switch_operation_mode_opple, 
-            //tz.xiaomi_switch_power_outage_memory,
+            tz.xiaomi_switch_power_outage_memory,
             //tz.xiaomi_led_disabled_night, 
             tz.xiaomi_flip_indicator_light
         ],
